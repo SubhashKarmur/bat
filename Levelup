@@ -1,0 +1,79 @@
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class FolderBalancer {
+
+    public static void main(String[] args) {
+        String[] folderPaths = {
+            "path/to/folder1",
+            "path/to/folder2",
+            "path/to/folder3",
+            "path/to/folder4",
+            "path/to/folder5",
+            "path/to/folder6",
+            "path/to/folder7",
+            "path/to/folder8"
+        };
+
+        balanceFolders(folderPaths);
+    }
+
+    public static void balanceFolders(String[] folderPaths) {
+        List<File> folders = getFolders(folderPaths);
+        int totalDocuments = getTotalDocuments(folders);
+        int targetDocumentsPerFolder = totalDocuments / folders.size();
+
+        ExecutorService executor = Executors.newFixedThreadPool(folders.size());
+
+        for (File folder : folders) {
+            executor.submit(() -> {
+                try {
+                    balanceFolder(folder, folders, targetDocumentsPerFolder);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+
+        executor.shutdown();
+    }
+
+    private static List<File> getFolders(String[] folderPaths) {
+        List<File> folders = new ArrayList<>();
+        for (String path : folderPaths) {
+            folders.add(new File(path));
+        }
+        return folders;
+    }
+
+    private static int getTotalDocuments(List<File> folders) {
+        return folders.stream().mapToInt(folder -> folder.listFiles().length).sum();
+    }
+
+    private static void balanceFolder(File folder, List<File> folders, int targetDocumentsPerFolder) throws IOException {
+        File[] files = folder.listFiles();
+        if (files == null) return;
+
+        for (File file : files) {
+            if (folder.listFiles().length <= targetDocumentsPerFolder) break;
+
+            for (File targetFolder : folders) {
+                if (targetFolder.listFiles().length < targetDocumentsPerFolder) {
+                    moveFile(file.toPath(), targetFolder.toPath().resolve(file.getName()));
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void moveFile(Path source, Path target) throws IOException {
+        Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+    }
+}
